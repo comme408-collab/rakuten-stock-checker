@@ -4,7 +4,7 @@ import os
 import smtplib
 from email.mime.text import MIMEText
 
-URL = "https://item.rakuten.co.jp/taka-sake/garagara-kuji-1/"
+URL = "https://item.rakuten.co.jp/taka-sake/garagara-kuji-2/"
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 def get_stock():
