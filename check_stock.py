@@ -1,51 +1,46 @@
 import requests
 from bs4 import BeautifulSoup
-import os
-import smtplib
-from email.mime.text import MIMEText
+import re
 
 URL = "https://item.rakuten.co.jp/taka-sake/garagara-kuji-2/"
-HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 def get_stock():
-    res = requests.get(URL, headers=HEADERS, timeout=30)
+    # ---- ページ取得 ----
+    res = requests.get(URL, headers={
+        "User-Agent": "Mozilla/5.0"
+    })
     res.raise_for_status()
+
     soup = BeautifulSoup(res.text, "html.parser")
 
-    # 在庫部分を正確に抽出
-    stock_element = soup.select_one("div.text-display--3jedW.type-body--27DSG.size-medium--3VTRm.align-left--3uu15.color-gray-darker--3K2Fe.layout-block--3uuSk")
-    if not stock_element:
-        raise Exception("在庫データの要素が見つかりませんでした")
+    # ---- 「数字のみの div」を幅広く取得 ----
+    possible_divs = soup.find_all("div")
 
-    stock_text = stock_element.text.strip()
+    for div in possible_divs:
+        if div.text.strip().isdigit():
+            # 見つけた数字を返す
+            return int(div.text.strip())
 
-    if not stock_text.isdigit():
-        raise Exception(f"在庫数が数値ではありません: {stock_text}")
+    # ---- 部分一致クラス絞り込み版 ----
+    stock_element = soup.find("div", class_=lambda x: x and "text-display" in x)
+    if stock_element:
+        stock = stock_element.text.strip()
+        if stock.isdigit():
+            return int(stock)
 
-    return int(stock_text)
+    # ---- 正規表現で拾う版 ----
+    numbers = re.findall(r'>\s*(\d{1,4})\s*<', res.text)
+    if numbers:
+        return int(numbers[0])
 
-def send_mail(subject, body):
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = os.environ["EMAIL_FROM"]
-    msg["To"] = os.environ["EMAIL_TO"]
+    # ---- どれもダメなら失敗 ----
+    raise Exception("在庫数が取得できませんでした")
 
-    with smtplib.SMTP("smtp.gmail.com", 587) as smtp:
-        smtp.starttls()
-        smtp.login(os.environ["EMAIL_FROM"], os.environ["EMAIL_PASS"])
-        smtp.send_message(msg)
 
 def main():
-    current_stock = get_stock()
-    prev_stock = os.getenv("PREV_STOCK")
+    stock = get_stock()
+    print(f"現在の在庫数: {stock}")
 
-    if prev_stock and int(prev_stock) != current_stock:
-        send_mail(
-            "【楽天】在庫数が変わりました",
-            f"URL: {URL}\n前回: {prev_stock}\n今回: {current_stock}"
-        )
-
-    print(f"PREV_STOCK={current_stock}")
 
 if __name__ == "__main__":
     main()
