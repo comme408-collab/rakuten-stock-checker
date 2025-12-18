@@ -1,14 +1,14 @@
-name: Run stock checker
+name: Rakuten Stock Checker
 
 on:
   workflow_dispatch:
 
 jobs:
-  check:
+  check-stock:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -16,16 +16,11 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Create virtual environment
+      - name: Install dependencies
         run: |
-          python -m venv venv
-          source venv/bin/activate
           python -m pip install --upgrade pip
-          python -m pip install playwright
-          python -m playwright install chromium
-          python -m playwright install-deps
+          pip install playwright
+          python -m playwright install
 
       - name: Run script
-        run: |
-          source venv/bin/activate
-          python check_stock.py
+        run: python check_stock.py
