@@ -16,19 +16,16 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Playwright + Python bindings
+      - name: Create virtual environment
         run: |
+          python -m venv venv
+          source venv/bin/activate
           python -m pip install --upgrade pip
           python -m pip install playwright
-
-      - name: Install Playwright browsers
-        run: |
           python -m playwright install chromium
           python -m playwright install-deps
 
-      - name: Debug Python packages
-        run: |
-          python -m pip list
-
       - name: Run script
-        run: python check_stock.py
+        run: |
+          source venv/bin/activate
+          python check_stock.py
