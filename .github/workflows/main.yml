@@ -16,14 +16,16 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install Playwright + Python bindings
         run: |
           pip install --upgrade pip
           pip install playwright
 
       - name: Install Playwright browsers
         run: |
+          playwright install
           playwright install chromium
+          playwright install-deps
 
       - name: Run script
         run: python check_stock.py
