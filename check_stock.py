@@ -88,20 +88,20 @@ def main():
         print("初回記録のため通知します（テスト用）")
         send_gmail(
             subject="【在庫チェック】初回記録",
-            body=f"現在の在庫数: {current_stock}"
+            body=f"現在の在庫数: {current_stock}\n\nページURL: {URL}"
         )
     elif prev_stock != current_stock:
         msg = f"在庫数が変化しました: {prev_stock} → {current_stock}"
         print(msg)
         send_gmail(
             subject="【在庫変化あり】通知",
-            body=msg
+            body=f"{msg}\n\nページURL: {URL}"
         )
     else:
         print("在庫数に変化なし")
         send_gmail(
             subject="【在庫変化なし】通知",
-            body=f"在庫数は変化なし: {current_stock}"
+            body=f"在庫数は変化なし: {current_stock}\n\nページURL: {URL}"
         )
 
 if __name__ == "__main__":
