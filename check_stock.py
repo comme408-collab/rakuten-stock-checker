@@ -1,32 +1,21 @@
-from playwright.sync_api import sync_playwright
-from bs4 import BeautifulSoup
+import re
+import requests
 
 URL = "https://item.rakuten.co.jp/taka-sake/garagara-kuji-2/"
 
 def get_stock():
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page()
-        page.goto(URL, timeout=60000)
+    r = requests.get(URL, timeout=10)
+    r.raise_for_status()
 
-        html = page.content()
-        browser.close()
+    m = re.search(r'"stockCount":(\d+)', r.text)
+    if not m:
+        raise Exception("在庫データが見つかりません")
 
-        soup = BeautifulSoup(html, "html.parser")
-
-        # 数字のみのDIVから在庫を抽出
-        for div in soup.find_all("div"):
-            txt = div.text.strip()
-            if txt.isdigit():
-                return int(txt)
-
-        raise Exception("在庫が見つかりません")
-
+    return int(m.group(1))
 
 def main():
     stock = get_stock()
-    print(f"現在の在庫: {stock}")
-
+    print(f"現在在庫数: {stock}")
 
 if __name__ == "__main__":
     main()
