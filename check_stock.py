@@ -1,32 +1,31 @@
-import requests
+from playwright.sync_api import sync_playwright
+from bs4 import BeautifulSoup
 
-APP_ID = "YOUR_RAKUTEN_API_KEY"
-ITEM_CODE = "taka-sake:garagara-kuji-2"
+URL = "https://item.rakuten.co.jp/taka-sake/garagara-kuji-2/"
 
 def get_stock():
-    url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601"
-    params = {
-        "applicationId": APP_ID,
-        "itemCode": ITEM_CODE
-    }
-    res = requests.get(url, params=params)
-    data = res.json()
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(URL, timeout=60000)
 
-    if "Items" not in data or len(data["Items"]) == 0:
-        raise Exception("商品が取得できません")
+        html = page.content()
+        browser.close()
 
-    item = data["Items"][0]["Item"]
+        soup = BeautifulSoup(html, "html.parser")
 
-    stock = item.get("stockcount", None)
-    if stock is None:
-        raise Exception("在庫情報が取れません")
+        # 数字のみのDIVから在庫を抽出
+        for div in soup.find_all("div"):
+            txt = div.text.strip()
+            if txt.isdigit():
+                return int(txt)
 
-    return stock
+        raise Exception("在庫が見つかりません")
 
 
 def main():
     stock = get_stock()
-    print(f"現在の在庫数: {stock}")
+    print(f"現在の在庫: {stock}")
 
 
 if __name__ == "__main__":
