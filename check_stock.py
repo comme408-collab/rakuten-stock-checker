@@ -1,27 +1,25 @@
 import requests
-import json
-import re
 
-URL = "https://item.rakuten.co.jp/taka-sake/garagara-kuji-2/"
+APP_ID = "YOUR_RAKUTEN_API_KEY"
+ITEM_CODE = "taka-sake:garagara-kuji-2"
 
 def get_stock():
-    # --- HTML取得 ---
-    res = requests.get(URL, headers={
-        "User-Agent": "Mozilla/5.0"
-    })
-    res.raise_for_status()
+    url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601"
+    params = {
+        "applicationId": APP_ID,
+        "itemCode": ITEM_CODE
+    }
+    res = requests.get(url, params=params)
+    data = res.json()
 
-    html = res.text
+    if "Items" not in data or len(data["Items"]) == 0:
+        raise Exception("商品が取得できません")
 
-    # --- JSONを含む script を抽出 ---
-    match = re.search(r'__RUC_ITEM__\s*=\s*(\{.*?\});', html, re.DOTALL)
-    if not match:
-        raise Exception("商品データJSONが見つかりません")
+    item = data["Items"][0]["Item"]
 
-    data = json.loads(match.group(1))
-
-    # --- 在庫数取得 ---
-    stock = data["displayInfo"]["stockCount"]
+    stock = item.get("stockcount", None)
+    if stock is None:
+        raise Exception("在庫情報が取れません")
 
     return stock
 
