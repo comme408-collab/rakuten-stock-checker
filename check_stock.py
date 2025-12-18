@@ -1,29 +1,61 @@
+from playwright.sync_api import sync_playwright
+import json
 import re
-import requests
 
-URL = "https://item.rakuten.co.jp/taka-sake/garagara-kuji-2/"
+URL = "https://item.rakuten.co.jp/kameyamadou/10013041/"
 
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/122.0.0.0 Safari/537.36"
-    )
-}
+UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/122.0.0.0 Safari/537.36"
+)
 
 def get_stock():
-    r = requests.get(URL, headers=HEADERS, timeout=30)
-    r.raise_for_status()
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent=UA,
+            locale="ja-JP",
+            java_script_enabled=True,
+        )
+        page = context.new_page()
 
-    m = re.search(r'"stockCount":(\d+)', r.text)
-    if not m:
-        raise Exception("在庫データが見つかりません")
+        page.goto(URL, timeout=30000)
 
-    return int(m.group(1))
+        html = page.content()
+
+        match = re.search(r"__NEXT_DATA__\">({.*?})</script>", html)
+        if not match:
+            raise Exception("商品データが取得できません（NEXT_DATA欠落）")
+
+        data = json.loads(match.group(1))
+
+        try:
+            product = (
+                data["props"]["pageProps"]["catalog"]["product"]["variants"][0]
+            )
+        except:
+            raise Exception("商品データの構造が取得できません")
+
+        stock = product.get("stock", None)
+
+        browser.close()
+
+        if stock is None:
+            raise Exception("在庫データが取得できません")
+
+        return stock
+
 
 def main():
     stock = get_stock()
-    print(f"現在在庫数: {stock}")
+    print(f"在庫数: {stock}")
+
+    if stock > 0:
+        print("★ 在庫あり！")
+    else:
+        print("在庫なし")
+
 
 if __name__ == "__main__":
     main()
