@@ -14,7 +14,7 @@ UA = (
 )
 
 LOG_FILE = "stock_log.csv"
-LINE_TOKEN = os.getenv("XirnIB6xicf0JlFlexfG9In+DmjIoItSkQuNp3a5VQRsv/VEu1w6uk3FxIac4BbSDZHJkhX2QOHFExpzrEBrpAXGVfo7C8daJGbG9zYZY6Kpuc2emkrHao/VTLkeE297BxGX7bN0J01dzIkRrCSuGAdB04t89/1O/w1cDnyilFU")  # GitHub Secretsに設定しておく
+LINE_TOKEN = os.getenv("LINE_NOTIFY_TOKEN")
 
 def get_stock():
     with sync_playwright() as p:
@@ -47,7 +47,6 @@ def save_and_check_change(stock):
             if rows:
                 prev_stock = int(rows[-1][1])
 
-    # 履歴に追記
     with open(LOG_FILE, "a", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
         writer.writerow([datetime.now().isoformat(), stock])
@@ -61,7 +60,8 @@ def send_line_notify(message):
     url = "https://notify-api.line.me/api/notify"
     headers = {"Authorization": f"Bearer {LINE_TOKEN}"}
     data = {"message": message}
-    requests.post(url, headers=headers, data=data)
+    response = requests.post(url, headers=headers, data=data)
+    print("LINE Notify response:", response.status_code, response.text)
 
 def main():
     stock = get_stock()
@@ -71,6 +71,7 @@ def main():
 
     if prev_stock is None:
         print("初回記録のため通知しません")
+        send_line_notify("テスト通知: LINE連携確認")  # ← テスト用通知
     elif prev_stock != current_stock:
         msg = f"在庫数が変化しました: {prev_stock} → {current_stock}"
         print(msg)
