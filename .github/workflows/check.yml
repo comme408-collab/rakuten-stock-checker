@@ -9,6 +9,9 @@ jobs:
   check:
     runs-on: ubuntu-latest
 
+    env:
+      LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TOKEN }}
+
     steps:
       - uses: actions/checkout@v4
 
