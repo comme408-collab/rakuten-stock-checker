@@ -24,19 +24,22 @@ def get_stock():
         html = page.content()
         soup = BeautifulSoup(html, "html.parser")
 
-        # 在庫数が入っているdivを探す
-        stock_div = soup.find("div", class_=re.compile("text-display"))
-        if not stock_div:
-            browser.close()
-            raise Exception("在庫数を示す要素が見つかりません")
+        # text-display クラスを持つ要素をすべて取得
+        candidates = soup.find_all("div", class_=re.compile("text-display"))
 
-        try:
-            stock = int(stock_div.get_text(strip=True))
-        except ValueError:
-            browser.close()
-            raise Exception("在庫数を数値に変換できません")
+        stock = None
+        for div in candidates:
+            text = div.get_text(strip=True)
+            # 数字だけの要素を探す
+            if re.fullmatch(r"\d+", text):
+                stock = int(text)
+                break
 
         browser.close()
+
+        if stock is None:
+            raise Exception("在庫数を示す数値が見つかりません")
+
         return stock
 
 def main():
