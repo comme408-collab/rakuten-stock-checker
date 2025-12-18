@@ -12,11 +12,17 @@ def get_stock():
     res.raise_for_status()
     soup = BeautifulSoup(res.text, "html.parser")
 
-    for text in soup.stripped_strings:
-        if text.isdigit():
-            return int(text)
+    # 在庫部分を正確に抽出
+    stock_element = soup.select_one("div.text-display--3jedW.type-body--27DSG.size-medium--3VTRm.align-left--3uu15.color-gray-darker--3K2Fe.layout-block--3uuSk")
+    if not stock_element:
+        raise Exception("在庫データの要素が見つかりませんでした")
 
-    raise Exception("在庫数が取得できませんでした")
+    stock_text = stock_element.text.strip()
+
+    if not stock_text.isdigit():
+        raise Exception(f"在庫数が数値ではありません: {stock_text}")
+
+    return int(stock_text)
 
 def send_mail(subject, body):
     msg = MIMEText(body)
