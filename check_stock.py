@@ -24,22 +24,24 @@ def get_stock():
         html = page.content()
         soup = BeautifulSoup(html, "html.parser")
 
-        # 「売り切れ」テキストがあるか判定
-        if soup.find(string=re.compile("売り切れ")):
-            stock = 0
-        else:
-            # 「買い物かごに入れる」ボタンがあるか判定
-            if soup.select_one("input#addToCartButton, button.addCart"):
-                stock = 1
-            else:
-                stock = 0
+        # 在庫数が入っているdivを探す
+        stock_div = soup.find("div", class_=re.compile("text-display"))
+        if not stock_div:
+            browser.close()
+            raise Exception("在庫数を示す要素が見つかりません")
+
+        try:
+            stock = int(stock_div.get_text(strip=True))
+        except ValueError:
+            browser.close()
+            raise Exception("在庫数を数値に変換できません")
 
         browser.close()
         return stock
 
 def main():
     stock = get_stock()
-    print(f"在庫数判定: {stock}")
+    print(f"在庫数: {stock}")
 
     if stock > 0:
         print("★ 在庫あり！")
