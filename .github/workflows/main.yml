@@ -37,3 +37,5 @@ jobs:
 
       - name: Run script
         run: python check_stock.py
+        send_line_notify("テスト通知: LINE連携確認")
+
