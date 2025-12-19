@@ -1,5 +1,4 @@
 from playwright.sync_api import sync_playwright
-from bs4 import BeautifulSoup
 import re
 import csv
 import os
@@ -30,20 +29,20 @@ def get_stock():
         page = context.new_page()
         page.goto(URL, timeout=30000)
 
-        html = page.content()
-        soup = BeautifulSoup(html, "html.parser")
+        # 在庫数が描画される要素を待つ
+        page.wait_for_selector("div.text-display")
 
-        candidates = soup.find_all("div", class_=re.compile("text-display"))
-        stock = None
-        for div in candidates:
-            text = div.get_text(strip=True)
-            if re.fullmatch(r"\d+", text):
-                stock = int(text)
-                break
+        # inner_text を直接取得
+        text = page.inner_text("div.text-display")
+        print("取得テキスト:", text)
+
+        # 数字だけ抽出
+        match = re.search(r"\d+", text)
+        if not match:
+            raise Exception("在庫数が見つかりません")
+        stock = int(match.group(0))
 
         browser.close()
-        if stock is None:
-            raise Exception("在庫数を示す数値が見つかりません")
         return stock
 
 def save_and_check_change(stock):
