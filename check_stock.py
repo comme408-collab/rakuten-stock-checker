@@ -7,7 +7,6 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# チェック対象の商品ページリスト
 URLS = [
     "https://item.rakuten.co.jp/taka-sake/garagara-kuji-1/",
     "https://item.rakuten.co.jp/taka-sake/garagara-kuji-2/",
@@ -19,15 +18,12 @@ UA = (
     "Chrome/122.0.0.0 Safari/537.36"
 )
 
-# Gmail認証情報（環境変数から取得）
 GMAIL_USER = os.getenv("GMAIL_USER")
 GMAIL_PASS = os.getenv("GMAIL_PASS")
 
-# 在庫に関連するキーワード
 STOCK_KEYWORDS = ["在庫数", "在庫", "残り", "残数", "販売可能", "個"]
 
 def extract_stock_line_based(text: str) -> int | None:
-    """行ベースで在庫数を抽出"""
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     for i, line in enumerate(lines):
         if any(lbl in line for lbl in STOCK_KEYWORDS):
@@ -57,9 +53,7 @@ def get_stock_once(url: str) -> int | None:
         browser.close()
         return stock
 
-
 def send_gmail(subject, body, to=None):
-    """Gmailで通知を送信"""
     if not GMAIL_USER or not GMAIL_PASS:
         print("GMAIL_USER または GMAIL_PASS が設定されていません")
         return
