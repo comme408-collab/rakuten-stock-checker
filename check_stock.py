@@ -60,22 +60,6 @@ def get_stock_once(url: str) -> int | None:
         browser.close()
         return stock
 
-def save_and_check_change(stock, url):
-    """在庫数を保存し、前回値を返す"""
-    log_file = f"stock_log_{url.split('/')[-2]}.csv"
-    prev_stock = None
-    if os.path.exists(log_file):
-        with open(log_file, "r", encoding="utf-8") as f:
-            rows = list(csv.reader(f))
-            if rows:
-                prev_stock = int(rows[-1][1])
-
-    with open(log_file, "a", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow([datetime.now().isoformat(), stock])
-
-    return prev_stock, stock
-
 def send_gmail(subject, body, to=None):
     """Gmailで通知を送信"""
     if not GMAIL_USER or not GMAIL_PASS:
@@ -97,19 +81,34 @@ def send_gmail(subject, body, to=None):
 
 def main():
     for url in URLS:
+        log_file = f"stock_log_{url.split('/')[-2]}.csv"
+
+        # 1. 前回値を読み込む
+        prev_stock = None
+        if os.path.exists(log_file):
+            with open(log_file, "r", encoding="utf-8") as f:
+                rows = list(csv.reader(f))
+                if rows:
+                    prev_stock = int(rows[-1][1])
+
+        # 2. 現在値を取得
         current_stock = get_stock_once(url)
         print(f"{url} の在庫数: {current_stock}")
 
-        prev_stock, stock = save_and_check_change(current_stock, url)
+        # 3. ログに保存
+        with open(log_file, "a", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([datetime.now().isoformat(), current_stock])
 
+        # 4. 通知判定
         if prev_stock is None:
             print(f"{url}: 初回記録のため通知します")
             send_gmail(
                 subject=f"【在庫チェック 初回記録】{url}",
-                body=f"現在の在庫数: {stock}\n\nページURL: {url}"
+                body=f"現在の在庫数: {current_stock}\n\nページURL: {url}"
             )
-        elif prev_stock != stock:
-            msg = f"在庫数が変化しました: {prev_stock} → {stock}"
+        elif prev_stock != current_stock:
+            msg = f"在庫数が変化しました: {prev_stock} → {current_stock}"
             print(msg)
             send_gmail(
                 subject=f"【在庫変化あり】{url}",
@@ -119,7 +118,7 @@ def main():
             print(f"{url}: 在庫数に変化なし")
             send_gmail(
                 subject=f"【在庫変化なし】{url}",
-                body=f"在庫数は変化なし: {stock}\n\nページURL: {url}"
+                body=f"在庫数は変化なし: {current_stock}\n\nページURL: {url}"
             )
 
 if __name__ == "__main__":
