@@ -31,13 +31,11 @@ def extract_stock_line_based(text: str) -> int | None:
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     for i, line in enumerate(lines):
         if any(lbl in line for lbl in STOCK_KEYWORDS):
-            # 直後の行に数字があるケースを優先
             for j in range(1, 3):
                 if i + j < len(lines):
                     m = re.fullmatch(r"\d{1,5}", lines[i + j])
                     if m:
                         return int(m.group(0))
-    # フォールバック: キーワードを含む行から数字を抽出
     for line in lines:
         if any(lbl in line for lbl in STOCK_KEYWORDS):
             m = re.search(r"\d{1,5}", line)
@@ -48,7 +46,7 @@ def extract_stock_line_based(text: str) -> int | None:
 def get_stock_once(url: str) -> int | None:
     """指定URLの在庫数を1回取得"""
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(headheadless=True)
         context = browser.new_context(user_agent=UA, locale="ja-JP")
         page = context.new_page()
         page.goto(url, timeout=45000)
@@ -81,48 +79,38 @@ def send_gmail(subject, body, to=None):
 
 def main():
     for url in URLS:
-        # 商品IDをファイル名に使う（最後の要素を利用）
         product_id = url.strip("/").split("/")[-1]
         log_file = f"stock_log_{product_id}.csv"
 
-        # 1. 前回値を読み込む
         prev_stock = None
         if os.path.exists(log_file):
             with open(log_file, "r", encoding="utf-8") as f:
-                rows = [r for r in csv.reader(f) if r]  # 空行を除外
+                rows = [r for r in csv.reader(f) if r]
                 if rows:
                     try:
                         prev_stock = int(rows[-1][1])
-                    except Exception as e:
-                        print(f"前回値の読み込み失敗: {e}")
+                    except:
                         prev_stock = None
 
-        # 2. 現在値を取得
         current_stock = get_stock_once(url)
         print(f"{url} の在庫数: {current_stock}")
 
-        # 3. 通知判定
         if prev_stock is None:
-            print(f"{url}: 初回記録のため通知します")
             send_gmail(
                 subject=f"【在庫チェック 初回記録】{url}",
                 body=f"現在の在庫数: {current_stock}\n\nページURL: {url}"
             )
         elif prev_stock != current_stock:
-            msg = f"在庫数が変化しました: {prev_stock} → {current_stock}"
-            print(msg)
             send_gmail(
                 subject=f"【在庫変化あり】{url}",
-                body=f"{msg}\n\nページURL: {url}"
+                body=f"在庫数が変化しました: {prev_stock} → {current_stock}\n\nページURL: {url}"
             )
         else:
-            print(f"{url}: 在庫数に変化なし")
             send_gmail(
                 subject=f"【在庫変化なし】{url}",
                 body=f"在庫数は変化なし: {current_stock}\n\nページURL: {url}"
             )
 
-        # 4. ログに保存
         with open(log_file, "a", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([datetime.now().isoformat(), current_stock])
