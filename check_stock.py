@@ -44,9 +44,8 @@ def extract_stock_line_based(text: str) -> int | None:
     return None
 
 def get_stock_once(url: str) -> int | None:
-    """指定URLの在庫数を1回取得"""
     with sync_playwright() as p:
-        browser = p.chromium.launch(headheadless=True)
+        browser = p.chromium.launch(headless=True)
         context = browser.new_context(user_agent=UA, locale="ja-JP")
         page = context.new_page()
         page.goto(url, timeout=45000)
@@ -57,6 +56,7 @@ def get_stock_once(url: str) -> int | None:
         stock = extract_stock_line_based(text)
         browser.close()
         return stock
+
 
 def send_gmail(subject, body, to=None):
     """Gmailで通知を送信"""
