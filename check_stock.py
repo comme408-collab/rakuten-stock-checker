@@ -89,11 +89,12 @@ def main():
         prev_stock = None
         if os.path.exists(log_file):
             with open(log_file, "r", encoding="utf-8") as f:
-                rows = list(csv.reader(f))
+                rows = [r for r in csv.reader(f) if r]  # 空行を除外
                 if rows:
                     try:
                         prev_stock = int(rows[-1][1])
-                    except Exception:
+                    except Exception as e:
+                        print(f"前回値の読み込み失敗: {e}")
                         prev_stock = None
 
         # 2. 現在値を取得
