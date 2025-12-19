@@ -95,12 +95,7 @@ def main():
         current_stock = get_stock_once(url)
         print(f"{url} の在庫数: {current_stock}")
 
-        # 3. ログに保存
-        with open(log_file, "a", encoding="utf-8", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow([datetime.now().isoformat(), current_stock])
-
-        # 4. 通知判定
+        # 3. 通知判定
         if prev_stock is None:
             print(f"{url}: 初回記録のため通知します")
             send_gmail(
@@ -120,6 +115,11 @@ def main():
                 subject=f"【在庫変化なし】{url}",
                 body=f"在庫数は変化なし: {current_stock}\n\nページURL: {url}"
             )
+
+        # 4. ログに保存（最後に保存する）
+        with open(log_file, "a", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([datetime.now().isoformat(), current_stock])
 
 if __name__ == "__main__":
     main()
