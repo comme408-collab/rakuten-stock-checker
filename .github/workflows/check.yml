@@ -8,6 +8,7 @@ on:
 jobs:
   check-stock:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -27,7 +28,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install playwright beautifulsoup4
-          playwright install
+          playwright install chromium
 
       - name: Run stock checker
         run: python check_stock.py
@@ -36,4 +37,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: stock-logs
-          path: stock_log_*.csv
+          path: |
+            stock_log_*.csv
