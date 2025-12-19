@@ -17,6 +17,7 @@ jobs:
         with:
           name: stock-logs
           path: .
+        continue-on-error: true  # 初回は存在しないのでエラーを無視
 
       - name: Set up Python
         uses: actions/setup-python@v5
