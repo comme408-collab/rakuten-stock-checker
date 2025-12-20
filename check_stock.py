@@ -89,22 +89,24 @@ def main():
         current_stock = get_stock_once(url)
         print(f"{url} の在庫数: {current_stock}")
 
+        # --- 通知ロジック ---
         if prev_stock is None:
+            # 初回だけ通知
             send_gmail(
                 subject=f"【在庫チェック 初回記録】{url}",
                 body=f"現在の在庫数: {current_stock}\n\nページURL: {url}"
             )
+
         elif prev_stock != current_stock:
+            # 変化があったときだけ通知
             send_gmail(
                 subject=f"【在庫変化あり】{url}",
                 body=f"在庫数が変化しました: {prev_stock} → {current_stock}\n\nページURL: {url}"
             )
-        else:
-            send_gmail(
-                subject=f"【在庫変化なし】{url}",
-                body=f"在庫数は変化なし: {current_stock}\n\nページURL: {url}"
-            )
 
+        # 変化なし → メール送らない
+
+        # --- ログ更新 ---
         with open(log_file, "a", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([datetime.now().isoformat(), current_stock])
