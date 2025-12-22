@@ -89,22 +89,26 @@ def main():
         current_stock = get_stock_once(url)
         print(f"{url} の在庫数: {current_stock}")
 
-        # --- 通知ロジック ---
-        if prev_stock is None:
-            # 初回だけ通知
-            send_gmail(
-                subject=f"【在庫チェック 初回記録】{url}",
-                body=f"現在の在庫数: {current_stock}\n\nページURL: {url}"
-            )
+ # --- 通知ロジック ---
+        if current_stock is not None and current_stock > 10:
+            # 在庫が10より多いなら通知しない
+            print("在庫が10より多いため通知しません")
+        else:
+            # 在庫10以下になった場合のみ通知
+            if prev_stock is None:
+                # 初回だけ通知
+                send_gmail(
+                    subject=f"【在庫チェック 初回記録】{url}",
+                    body=f"現在の在庫数: {current_stock}\n\nページURL: {url}"
+                )
 
-        elif prev_stock != current_stock:
-            # 変化があったときだけ通知
-            send_gmail(
-                subject=f"【在庫変化あり】{url}",
-                body=f"在庫数が変化しました: {prev_stock} → {current_stock}\n\nページURL: {url}"
-            )
+            elif prev_stock != current_stock:
+                # 変化があったときだけ通知
+                send_gmail(
+                    subject=f"【在庫変化あり】{url}",
+                    body=f"在庫数が変化しました: {prev_stock} → {current_stock}\n\nページURL: {url}"
+                )
 
-        # 変化なし → メール送らない
 
         # --- ログ更新 ---
         with open(log_file, "a", encoding="utf-8", newline="") as f:
