@@ -76,44 +76,64 @@ def main():
         product_id = url.strip("/").split("/")[-1]
         log_file = f"stock_log_{product_id}.csv"
 
+        # --- 前回在庫の読み込み ---
         prev_stock = None
         if os.path.exists(log_file):
             with open(log_file, "r", encoding="utf-8") as f:
                 rows = [r for r in csv.reader(f) if r]
                 if rows:
-                    try:
-                        prev_stock = int(rows[-1][1])
-                    except:
+                    last_value = rows[-1][1]
+                    if last_value == "":
                         prev_stock = None
+                    else:
+                        try:
+                            prev_stock = int(last_value)
+                        except:
+                            prev_stock = None
 
+        # --- 今回の在庫取得 ---
         current_stock = get_stock_once(url)
         print(f"{url} の在庫数: {current_stock}")
 
- # --- 通知ロジック ---
-        if current_stock is not None and current_stock > 10:
-            # 在庫が10より多いなら通知しない
-            print("在庫が10より多いため通知しません")
-        else:
-            # 在庫10以下になった場合のみ通知
-            if prev_stock is None:
-                # 初回だけ通知
+        # --- 通知ロジック ---
+        if prev_stock is None:
+            # 初回（ただし売り切れの場合は通知しない）
+            if current_stock is not None:
                 send_gmail(
                     subject=f"【在庫チェック 初回記録】{url}",
                     body=f"現在の在庫数: {current_stock}\n\nページURL: {url}"
                 )
 
-            elif prev_stock != current_stock:
-                # 変化があったときだけ通知
+        else:
+            # 売り切れになった瞬間
+            if prev_stock is not None and current_stock is None:
+                send_gmail(
+                    subject=f"【売り切れ】{url}",
+                    body=f"在庫が売り切れになりました: {prev_stock} → 売り切れ\n\nページURL: {url}"
+                )
+
+            # 再入荷（None → 数値）
+            elif prev_stock is None and current_stock is not None:
+                send_gmail(
+                    subject=f"【再入荷】{url}",
+                    body=f"在庫が復活しました: 売り切れ → {current_stock}\n\nページURL: {url}"
+                )
+
+            # 数値同士の変化
+            elif prev_stock != current_stock and current_stock is not None:
                 send_gmail(
                     subject=f"【在庫変化あり】{url}",
                     body=f"在庫数が変化しました: {prev_stock} → {current_stock}\n\nページURL: {url}"
                 )
 
+            # 売り切れ継続（None → None）は通知しない
+            # 在庫変化なしも通知しない
 
-        # --- ログ更新 ---
+        # --- ログ更新（None は空文字で保存） ---
+        value = "" if current_stock is None else current_stock
         with open(log_file, "a", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow([datetime.now().isoformat(), current_stock])
+            writer.writerow([datetime.now().isoformat(), value])
 
 if __name__ == "__main__":
     main()
