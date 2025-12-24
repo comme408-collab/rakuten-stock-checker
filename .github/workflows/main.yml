@@ -1,41 +1,49 @@
-name: Rakuten Stock Checker
+def main():
+    for url in URLS:
+        product_id = url.strip("/").split("/")[-1]
+        log_file = f"stock_log_{product_id}.csv"
 
-on:
-  workflow_dispatch:
+        prev_stock = None
+        if os.path.exists(log_file):
+            with open(log_file, "r", encoding="utf-8") as f:
+                rows = [r for r in csv.reader(f) if r]
+                if rows:
+                    try:
+                        prev_stock = int(rows[-1][1])
+                    except:
+                        prev_stock = None
 
-jobs:
-  check-stock:
-    runs-on: ubuntu-latest
+        current_stock = get_stock_once(url)
+        print(f"{url} の在庫数: {current_stock}")
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+        # --- 通知ロジック ---
+        if prev_stock is None:
+            # 初回だけ通知（ただし売り切れの場合は通知しない）
+            if current_stock is not None:
+                send_gmail(
+                    subject=f"【在庫チェック 初回記録】{url}",
+                    body=f"現在の在庫数: {current_stock}\n\nページURL: {url}"
+                )
 
-      - name: Show current directory
-        run: pwd
+        else:
+            # 売り切れになった瞬間（prev_stock が数値 → current_stock が None）
+            if prev_stock is not None and current_stock is None:
+                send_gmail(
+                    subject=f"【売り切れ】{url}",
+                    body=f"在庫が売り切れになりました: {prev_stock} → 売り切れ\n\nページURL: {url}"
+                )
 
-      - name: List files
-        run: ls -R .
+            # 在庫数が変化した（どちらも数値）
+            elif prev_stock != current_stock and current_stock is not None:
+                send_gmail(
+                    subject=f"【在庫変化あり】{url}",
+                    body=f"在庫数が変化しました: {prev_stock} → {current_stock}\n\nページURL: {url}"
+                )
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
+            # 売り切れ継続（prev=None → current=None）は通知しない
+            # 在庫変化なしも通知しない
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r ./requirements.txt
-          pip show playwright || echo "Playwright not installed"
-          python -m playwright install
-          python -m playwright install-deps
-
-      - name: Confirm playwright installation
-        run: |
-          pip list | grep playwright || echo "Playwright missing"
-          python -c "import playwright" || echo "Python cannot import playwright"
-
-      - name: Run script
-        run: python check_stock.py
-        send_line_notify("テスト通知: LINE連携確認")
-
+        # --- ログ更新 ---
+        with open(log_file, "a", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([datetime.now().isoformat(), current_stock])
