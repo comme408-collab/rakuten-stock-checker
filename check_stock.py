@@ -23,22 +23,41 @@ GMAIL_PASS = os.getenv("GMAIL_PASS")
 
 STOCK_KEYWORDS = ["在庫数", "在庫", "残り", "残数", "販売可能", "個"]
 
+
+# -------------------------
+# 在庫抽出ロジック（強化版）
+# -------------------------
 def extract_stock_line_based(text: str) -> int | None:
     lines = [l.strip() for l in text.splitlines() if l.strip()]
-    for i, line in enumerate(lines):
-        if any(lbl in line for lbl in STOCK_KEYWORDS):
-            for j in range(1, 3):
-                if i + j < len(lines):
-                    m = re.fullmatch(r"\d{1,5}", lines[i + j])
-                    if m:
-                        return int(m.group(0))
+
+    # パターン1：在庫/残り + 数字
+    pattern1 = re.compile(r"(在庫|残り|残数|販売可能)[^\d]{0,5}(\d{1,5})")
     for line in lines:
-        if any(lbl in line for lbl in STOCK_KEYWORDS):
+        m = pattern1.search(line)
+        if m:
+            return int(m.group(2))
+
+    # パターン2：キーワード行の次の行が数字
+    for i, line in enumerate(lines):
+        if any(k in line for k in STOCK_KEYWORDS):
+            if i + 1 < len(lines):
+                m = re.fullmatch(r"\d{1,5}", lines[i + 1])
+                if m:
+                    return int(m.group(0))
+
+    # パターン3：キーワード行に数字が含まれる
+    for line in lines:
+        if any(k in line for k in STOCK_KEYWORDS):
             m = re.search(r"\d{1,5}", line)
             if m:
                 return int(m.group(0))
+
     return None
 
+
+# -------------------------
+# Playwright で在庫取得
+# -------------------------
 def get_stock_once(url: str) -> int | None:
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -53,6 +72,10 @@ def get_stock_once(url: str) -> int | None:
         browser.close()
         return stock
 
+
+# -------------------------
+# Gmail 通知
+# -------------------------
 def send_gmail(subject, body, to=None):
     if not GMAIL_USER or not GMAIL_PASS:
         print("GMAIL_USER または GMAIL_PASS が設定されていません")
@@ -69,8 +92,13 @@ def send_gmail(subject, body, to=None):
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(GMAIL_USER, GMAIL_PASS)
         server.send_message(msg)
+
     print("メール送信完了:", subject)
 
+
+# -------------------------
+# メイン処理
+# -------------------------
 def main():
     for url in URLS:
         product_id = url.strip("/").split("/")[-1]
@@ -95,9 +123,12 @@ def main():
         current_stock = get_stock_once(url)
         print(f"{url} の在庫数: {current_stock}")
 
-        # --- 通知ロジック ---
+        # -------------------------
+        # 通知ロジック（最終安定版）
+        # -------------------------
+
+        # 初回（ただし売り切れは通知しない）
         if prev_stock is None:
-            # 初回（ただし売り切れの場合は通知しない）
             if current_stock is not None:
                 send_gmail(
                     subject=f"【在庫チェック 初回記録】{url}",
@@ -105,7 +136,7 @@ def main():
                 )
 
         else:
-            # 売り切れになった瞬間
+            # 売り切れになった瞬間（数値 → None）
             if prev_stock is not None and current_stock is None:
                 send_gmail(
                     subject=f"【売り切れ】{url}",
@@ -120,7 +151,11 @@ def main():
                 )
 
             # 数値同士の変化
-            elif prev_stock != current_stock and current_stock is not None:
+            elif (
+                prev_stock is not None
+                and current_stock is not None
+                and prev_stock != current_stock
+            ):
                 send_gmail(
                     subject=f"【在庫変化あり】{url}",
                     body=f"在庫数が変化しました: {prev_stock} → {current_stock}\n\nページURL: {url}"
@@ -134,6 +169,7 @@ def main():
         with open(log_file, "a", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([datetime.now().isoformat(), value])
+
 
 if __name__ == "__main__":
     main()
