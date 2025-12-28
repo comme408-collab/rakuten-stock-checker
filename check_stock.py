@@ -1,5 +1,4 @@
 from playwright.sync_api import sync_playwright
-import re
 import csv
 import os
 from datetime import datetime
@@ -21,42 +20,11 @@ UA = (
 GMAIL_USER = os.getenv("GMAIL_USER")
 GMAIL_PASS = os.getenv("GMAIL_PASS")
 
-STOCK_KEYWORDS = ["在庫数", "在庫", "残り", "残数", "販売可能", "個"]
+THRESHOLD = 10  # 10以下になったら通知
 
 
 # -------------------------
-# 在庫抽出ロジック（強化版）
-# -------------------------
-def extract_stock_line_based(text: str) -> int | None:
-    lines = [l.strip() for l in text.splitlines() if l.strip()]
-
-    # パターン1：在庫/残り + 数字
-    pattern1 = re.compile(r"(在庫|残り|残数|販売可能)[^\d]{0,5}(\d{1,5})")
-    for line in lines:
-        m = pattern1.search(line)
-        if m:
-            return int(m.group(2))
-
-    # パターン2：キーワード行の次の行が数字
-    for i, line in enumerate(lines):
-        if any(k in line for k in STOCK_KEYWORDS):
-            if i + 1 < len(lines):
-                m = re.fullmatch(r"\d{1,5}", lines[i + 1])
-                if m:
-                    return int(m.group(0))
-
-    # パターン3：キーワード行に数字が含まれる
-    for line in lines:
-        if any(k in line for k in STOCK_KEYWORDS):
-            m = re.search(r"\d{1,5}", line)
-            if m:
-                return int(m.group(0))
-
-    return None
-
-
-# -------------------------
-# Playwright で在庫取得
+# Playwright で在庫を DOM から直接取得（最強・最安定）
 # -------------------------
 def get_stock_once(url: str) -> int | None:
     with sync_playwright() as p:
@@ -67,10 +35,19 @@ def get_stock_once(url: str) -> int | None:
         page.wait_for_load_state("domcontentloaded")
         page.wait_for_load_state("networkidle")
 
-        text = page.inner_text("body")
-        stock = extract_stock_line_based(text)
-        browser.close()
-        return stock
+        try:
+            # 在庫数の div（2つ目）を直接取得
+            stock_text = page.inner_text(
+                "td.normal-reserve-inventory div:nth-of-type(2)"
+            ).strip()
+
+            if stock_text.isdigit():
+                return int(stock_text)
+
+        except Exception as e:
+            print("在庫取得エラー:", e)
+
+        return None
 
 
 # -------------------------
@@ -111,25 +88,19 @@ def main():
                 rows = [r for r in csv.reader(f) if r]
                 if rows:
                     last_value = rows[-1][1]
-                    if last_value == "":
-                        prev_stock = None
-                    else:
-                        try:
-                            prev_stock = int(last_value)
-                        except:
-                            prev_stock = None
+                    prev_stock = int(last_value) if last_value.isdigit() else None
 
         # --- 今回の在庫取得 ---
         current_stock = get_stock_once(url)
         print(f"{url} の在庫数: {current_stock}")
 
         # -------------------------
-        # 通知ロジック（最終安定版）
+        # 通知ロジック（しきい値対応・最終安定版）
         # -------------------------
 
-        # 初回（ただし売り切れは通知しない）
+        # 初回（ただし在庫がしきい値以下のときだけ通知）
         if prev_stock is None:
-            if current_stock is not None:
+            if current_stock is not None and current_stock <= THRESHOLD:
                 send_gmail(
                     subject=f"【在庫チェック 初回記録】{url}",
                     body=f"現在の在庫数: {current_stock}\n\nページURL: {url}"
@@ -145,10 +116,11 @@ def main():
 
             # 再入荷（None → 数値）
             elif prev_stock is None and current_stock is not None:
-                send_gmail(
-                    subject=f"【再入荷】{url}",
-                    body=f"在庫が復活しました: 売り切れ → {current_stock}\n\nページURL: {url}"
-                )
+                if current_stock <= THRESHOLD:
+                    send_gmail(
+                        subject=f"【再入荷】{url}",
+                        body=f"在庫が復活しました: 売り切れ → {current_stock}\n\nページURL: {url}"
+                    )
 
             # 数値同士の変化
             elif (
@@ -156,13 +128,12 @@ def main():
                 and current_stock is not None
                 and prev_stock != current_stock
             ):
-                send_gmail(
-                    subject=f"【在庫変化あり】{url}",
-                    body=f"在庫数が変化しました: {prev_stock} → {current_stock}\n\nページURL: {url}"
-                )
-
-            # 売り切れ継続（None → None）は通知しない
-            # 在庫変化なしも通知しない
+                # しきい値をまたいだときだけ通知
+                if prev_stock > THRESHOLD and current_stock <= THRESHOLD:
+                    send_gmail(
+                        subject=f"【在庫が少なくなりました】{url}",
+                        body=f"在庫数が {prev_stock} → {current_stock} に減りました（しきい値 {THRESHOLD} 以下）\n\nページURL: {url}"
+                    )
 
         # --- ログ更新（None は空文字で保存） ---
         value = "" if current_stock is None else current_stock
